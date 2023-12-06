@@ -1,0 +1,14 @@
+Can you build a strategy script with this two indicators?
+I need it to require the following in order to enter a position:
+LONG POSITION:
+• The latest bot alert needs to be a BUY signal.
+• The color of the heikin ashi candles needs to be green.
+• The price must have gone inside the heikin ashi candle, tested and respected it, closing above said heikin ashi candle.
+• The entry price should be set to the closing price of the last candle.
+
+SHORT POSITION:
+• The latest bot alert needs to be a SELL signal.
+• The color of the heikin ashi candles needs to be red.
+• The price must have gone inside the heikin ashi candle, tested and respected it, closing below said heikin ashi candle.
+• The entry price should be set to the closing price of the last candle.
+
