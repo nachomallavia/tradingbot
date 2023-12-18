@@ -3,8 +3,8 @@ const axios = require('axios');
 const exchangeSetup = require('./exchangeSetup');
 const websocketSetup = require('./websocketSetup')
 const exchange = exchangeSetup();
-
-const app = require('express')();
+const express = require('express')
+const app = express();
 const port= process.env.PORT;
 
 //define the current trading pair
@@ -13,7 +13,7 @@ let wsAccount;
 let wsMarketData;
 let lastTradedPrice
 websocketSetup()
-
+app.use(express.json())
 app.use( async (req,res,next) =>{
     const balance = await exchange.fetchBalance();
     data=balance.USDT;
@@ -21,12 +21,27 @@ app.use( async (req,res,next) =>{
     next()
 })
 app.get('/',(req,res)=>{
-   res.send('Nuevo enfoque')
+   res.sendFile(__dirname+'/index.html')
+})
+app.post('/open',(req,res)=>{
+  const message = req.body;
+  console.log(message)
+  res.send('Message Received')
 })
 app.listen(port,()=>{
     console.log(`listening on port ${port}`)
     console.log(exchange.urls)
 })
+let balance
+async function getOpenPositions(){
+  console.log(balance)
+}
+getOpenPositions()
+setInterval(async()=>{
+  
+  console.log('-----------------------------------')
+  console.log(balance?balance:'Loading...')
+},1000)
 process.on('SIGINT', () => {
   if (wsAccount) {
     wsAccount.close();

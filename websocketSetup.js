@@ -58,7 +58,6 @@ async function websocketSetup(){
     function connectWebSockets() {
 
         wsAccount = new WebSocket(authenticadeWebsocketEndpoint);
-        wsMarketData =new WebSocket(exchangeWebsocketMarketDataEndpoint)
         
         wsAccount.on('open', () => {
             console.log('Account WebSocket connection opened');
@@ -67,7 +66,7 @@ async function websocketSetup(){
                 "params":
                 [
                 `${listenKey}@account`, // request name 1
-                `${listenKey}@balance`, // request name 2, if existing
+                `${listenKey}@balance`  // request name 2, if existing
                 ],
                 "id": 15 // request ID.
             }))        
@@ -82,7 +81,7 @@ async function websocketSetup(){
             console.log('Received PING, sending PONG')            
             wsAccount.pong();
         } else {
-            console.log(message.result[0].res);
+            console.log(message.result[1].res);
             
         }
         });
@@ -101,36 +100,39 @@ async function websocketSetup(){
         connectWebSockets();
         });
 
-        wsMarketData.on('open', () => {
-            console.log('Market Data WebSocket connection opened');          
 
-        });
-        wsMarketData.on('message', (data) => {
-            data=data.toString()
-            const message = JSON.parse(data);
+        // wsMarketData =new WebSocket(exchangeWebsocketMarketDataEndpoint)
+        
+        // wsMarketData.on('open', () => {
+        //     console.log('Market Data WebSocket connection opened');          
+
+        // });
+        // wsMarketData.on('message', (data) => {
+        //     data=data.toString()
+        //     const message = JSON.parse(data);
             
-             if (message.ping) {
-            console.log('Received PING, sending PONG')            
-            wsMarketData.pong();
-            } else {
-                console.log(message.p);
-                lastTradedPrice = message.p                
-            }
-        });
+        //      if (message.ping) {
+        //     console.log('Received PING, sending PONG')            
+        //     wsMarketData.pong();
+        //     } else {
+        //         console.log(message.p);
+        //         lastTradedPrice = message.p                
+        //     }
+        // });
     
-        wsMarketData.on('pong', () => {
-            console.log('Received Pong response');
-        });
+        // wsMarketData.on('pong', () => {
+        //     console.log('Received Pong response');
+        // });
     
-        wsMarketData.on('error', (error) => {
-            console.error('WebSocket Market Data error:', error);
-        });
+        // wsMarketData.on('error', (error) => {
+        //     console.error('WebSocket Market Data error:', error);
+        // });
     
-        wsMarketData.on('close', (code, reason) => {
-             console.log(`WebSocket Market Data connection closed, code: ${code}, reason: ${reason}`);
-        // Reconnect on close
-        connectWebSockets();
-        });
+        // wsMarketData.on('close', (code, reason) => {
+        //      console.log(`WebSocket Market Data connection closed, code: ${code}, reason: ${reason}`);
+        // // Reconnect on close
+        // connectWebSockets();
+        // });
     }
 
     // Initial connection
