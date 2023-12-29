@@ -1,5 +1,5 @@
 require('dotenv').config();
-
+const crypto = require('crypto')
 const exchangeSetup = require('./exchangeSetup');
 const exchange = exchangeSetup();
 const restEndpoint = exchange.urls.api.fapiPrivate
@@ -14,8 +14,12 @@ async function websocketSetup(){
 
     async function createUserDataStream() {
         try {
+          const timestamp = new Date().getTime();
+          const queryString =`timestamp=${timestamp}&apiKey=${process.env.API_KEY}`
+          const signature = crypto.createHmac('sha256',process.env.SECRET).update(queryString).digest('hex')
+          const sigString =`signature=${signature}`
           const response = await axios.post(
-            `${restEndpoint+process.env.LISTENKEY_ENDPOINT}`,
+            `${restEndpoint+process.env.LISTENKEY_ENDPOINT}?${queryString}&${sigString}`,
             null,
             {
               headers: {
@@ -61,14 +65,22 @@ async function websocketSetup(){
         
         wsAccount.on('open', () => {
             console.log('Account WebSocket connection opened');
+            // wsAccount.send(JSON.stringify({
+            //     "method": "REQUEST",
+            //     "params":
+            //     [
+            //     `${listenKey}@account` // request name 1
+            //     // `${listenKey}@balance`  // request name 2, if existing
+            //     ],
+            //     "id": 15, // request ID.
+               
+            // }))
             wsAccount.send(JSON.stringify({
-                "method": "REQUEST",
-                "params":
-                [
-                `${listenKey}@account`, // request name 1
-                `${listenKey}@balance`  // request name 2, if existing
-                ],
-                "id": 15 // request ID.
+              "id": 1,
+              "method": "SUBSCRIBE",
+              "params":[
+                `${listenKey}@account`
+              ]
             }))        
 
         });
@@ -81,7 +93,7 @@ async function websocketSetup(){
             console.log('Received PING, sending PONG')            
             wsAccount.pong();
         } else {
-            console.log(message.result[1].res);
+            console.log(message);
             
         }
         });
@@ -102,6 +114,7 @@ async function websocketSetup(){
 
 
         // wsMarketData =new WebSocket(exchangeWebsocketMarketDataEndpoint)
+        // // wsMarketData =new WebSocket(webSocketBaseURL)
         
         // wsMarketData.on('open', () => {
         //     console.log('Market Data WebSocket connection opened');          

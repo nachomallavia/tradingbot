@@ -1,0 +1,175 @@
+//@version=5
+strategy("RSI Based Entries", overlay = true, explicit_plot_zorder = true, initial_capital = 1000, default_qty_type = strategy.percent_of_equity, default_qty_value = 100)
+import TradingView/ta/5
+//STRATEGY CONFIG
+profitPerc = input.float(3, title="Take Profit (%)", minval=1.0, step=0.1) * 0.01
+stopPerc = input.float(2, title = "Stop Loss %", minval=1.0, step=0.1)*0.01
+stopToEntryThreshold = input.float(1, title="Move Stop to entry price (%)", minval=0.5, step=0.1)*0.01
+
+
+longExitPrice  = strategy.position_avg_price * (1 + profitPerc)
+longStopToEntryPrice = strategy.position_avg_price * (1 + stopToEntryThreshold)
+shortExitPrice = strategy.position_avg_price * (1 - profitPerc)
+
+longStopPrice = strategy.position_avg_price * (1 - stopPerc)
+shortStopToEntryPrice = strategy.position_avg_price * (1 - stopToEntryThreshold)
+shortStopPrice = strategy.position_avg_price * (1 + stopPerc)
+// Define non-repainting security function
+f_nrpSecurity(_timeframe,_exp) =>
+    request.security(syminfo.tickerid, _timeframe, _exp[barstate.isrealtime ? 1 : 0])[barstate.isrealtime ? 0 : 1]
+
+
+length = input.int(20, minval=1)
+maType = input.string("SMA", "Basis MA Type", options = ["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"])
+bbSrc = input(close, title="Source")
+mult = input.float(2.0, minval=0.001, maxval=50, title="StdDev")
+devThreshold = input.float(6.0, minval=0.001, maxval=100, title="Dev Threshold")
+bbMaTimeframe = input.timeframe('60','Big MA Timeframe')
+bbMaSource = request.security(syminfo.tickerid, bbMaTimeframe, close)
+// bbMaSource = f_nrpSecurity(bbMaTimeframe, bbSrc)
+
+bigMaLengthOne = input.int(6, minval=1)
+bigMaLengthTwo = input.int(60, minval=1)
+
+bigMaType = input.string("EMA", "Basis MA Type", options = ["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"])
+
+
+ma(source, length, _type) =>
+    switch _type
+        "SMA" => ta.sma(source, length)
+        "EMA" => ta.ema(source, length)
+        "SMMA (RMA)" => ta.rma(source, length)
+        "WMA" => ta.wma(source, length)
+        "VWMA" => ta.vwma(source, length)
+
+basis = f_nrpSecurity(bbMaTimeframe,ma(bbMaSource, length, maType))
+bigMaOne = f_nrpSecurity(bbMaTimeframe,ma(bbMaSource,bigMaLengthOne,bigMaType))
+bigMaTwo = f_nrpSecurity(bbMaTimeframe,ma(bbMaSource,bigMaLengthTwo,bigMaType))
+int bigMaTrend = na
+bigMaColor = color.new(color.green,0)
+if (bigMaOne > bigMaTwo)
+    bigMaColor :=  color.new(color.green,0)
+    bigMaTrend := 1
+if (bigMaOne < bigMaTwo)
+    bigMaColor :=  color.new(color.red,0)
+    bigMaTrend := -1
+dev = f_nrpSecurity(bbMaTimeframe,mult * ta.stdev(bbSrc, length))
+upper = basis + dev
+lower = basis - dev
+devPercent = (dev/basis)*100
+bandColor = color.new(color.rgb(33, 37, 243),0)
+//context conditions
+bool prevCloseAboveUpper = close[1] > upper
+bool prevCloseBelowLower = close[1] < lower
+bool closeInside = close[1] < upper and close[1] > lower
+bool bbExtended = na
+if (devPercent > devThreshold)
+    bandColor:=color.new(color.orange,0)
+    bbExtended :=true
+bool buyContext = prevCloseBelowLower and bbExtended and bigMaTrend < 0 or bigMaTrend > 0 and closeInside or prevCloseBelowLower and bigMaTrend > 0
+bool sellContext = prevCloseAboveUpper and bbExtended and bigMaTrend > 0 or bigMaTrend < 0  and closeInside or prevCloseAboveUpper and bigMaTrend < 0
+offset = input.int(0, "Offset", minval = -500, maxval = 500)
+// plot(basis, "Basis", color=#54d3e4, offset = offset)
+
+// plot(bigMaOne, "Big Ma One", color=bigMaColor, offset = offset, linewidth = 2)
+// plot(bigMaTwo, "Big Ma Two", color=color.new(color.gray,50),offset = offset, linewidth = 2)
+// p1 = plot(upper, "Upper", color=bandColor, offset = offset)
+// p2 = plot(lower, "Lower", color=bandColor, offset = offset)
+// fill(p1, p2, title = "Background", color=color.rgb(33, 150, 243, 95))
+
+//END BOLLINGER BAND SETUP
+
+// IBS SETUP
+priceC = close
+priceO = open
+ibs = (close - low) / (high - low) * 100
+bool ibsBuySignal = na
+bool ibsSellSignal = na
+ibsColor = color.new(color.gray,0)
+if(ibs > 70)
+    ibsColor := color.new(color.green, 80)
+    ibsBuySignal := true
+if(ibs < 30)
+    ibsColor := color.new(color.red, 80)
+    ibsSellSignal := true
+plot(ibs, 'Inter Bar Strength', color= ibsColor, style = plot.style_circles, linewidth = 1)
+float percentThreshold = input(1, 'Candle % Move Threshold')
+priceDiff = ((priceC - priceO) * 100) / priceO 
+
+changeColor = color.new(color.green,90)
+if (priceDiff > percentThreshold)
+    changeColor := color.new(color.green,0)
+if (priceDiff < 0)
+    changeColor := color.new(color.red,90)
+if (priceDiff < -percentThreshold)
+    changeColor := color.new(color.red,0)
+plot(priceDiff, color=changeColor, style = plot.style_cross, linewidth = 2, title="Change")
+
+
+// RSI INDICATOR
+myPeriod = input(defval = 6, title="RSI Period")
+src = input(close)
+
+myRSI = ta.rsi(src, myPeriod)
+
+
+h30 = hline(30,color=color.new(color.red,0),linestyle=hline.style_solid,title='Low')
+h70 = hline(70,color=color.new(color.green,0),linestyle=hline.style_solid,title = 'High')
+h20 = hline(20, color=color.new(color.yellow,0),linestyle = hline.style_solid,title='Second low')
+h80 = hline(80, color=color.new(color.yellow,0),linestyle=hline.style_solid,title='Second high')
+h50 = hline(50, color=color.rgb(100,100,100),linestyle = hline.style_solid, title= 'Mid line')
+h35 = hline(40, color = color.new(color.purple,0), linestyle = hline.style_solid,title = '35 line')
+h65 = hline(60, color = color.new(color.teal,0), linestyle = hline.style_solid, title = '65 line')
+
+fill(h30,h70,color.new(color.fuchsia,90), title= 'Background color')
+
+RSIplot = plot(myRSI,color=color.new(color.white,25),linewidth=1,title="RSI")
+plot(myRSI >= 70 or myRSI<= 30? myRSI:na,style = plot.style_linebr,linewidth=4,color=color.new(color.orange,0), title = 'Overextended color')
+
+rsiThreshold = input(35,"RSI Threshold")
+rsiBigJump = 15
+rsiBuySignal = myRSI[2]<=30 and myRSI[1]<=30 and myRSI >= rsiThreshold or myRSI - myRSI[1] >= rsiBigJump and myRSI < 55
+rsiSellSignal = myRSI[2]>=70 and myRSI[1]>=70 and myRSI <= 100-rsiThreshold or myRSI[1]-myRSI >= rsiBigJump and myRSI > 45
+float entry = na
+color entryColor = na
+if rsiBuySignal
+    entry:=myRSI
+    entryColor := color.new(color.lime,0)
+if rsiSellSignal
+    entry:=myRSI  
+    entryColor:=color.new(color.red,0)
+plot(entry,'Entry',style = plot.style_circles, color=entryColor, linewidth = 3)
+int matchConditions = na
+if(priceDiff > percentThreshold and rsiBuySignal and ibsBuySignal and buyContext)
+    matchConditions := 50
+    ibsColor := color.new(color.green, 0)
+    strategy.entry('LONG', strategy.long)
+    
+if(priceDiff < -percentThreshold and rsiSellSignal and ibsSellSignal and sellContext)
+    matchConditions := 50
+    ibsColor := color.new(color.red, 0)
+    strategy.entry('SHORT', strategy.short)
+plot(matchConditions+50,'Conditions met', color= entryColor, style = plot.style_histogram, linewidth = 1)
+
+
+// Define non-repainting security function
+f_nrpSecurity(_exp) =>
+    request.security(syminfo.tickerid, '60', _exp[barstate.isrealtime ? 1 : 0])[barstate.isrealtime ? 0 : 1]
+
+// if strategy.position_size > 0 and close >= longStopToEntryPrice
+//     strategy.exit("STOPLOSS LONG ENTRY", "LONG",stop = strategy.position_avg_price)
+
+if strategy.position_size > 0 and high >= longExitPrice
+    strategy.exit("PROFIT LONG", "LONG",profit=longExitPrice)
+
+if strategy.position_size > 0 and close <= longStopPrice
+    strategy.exit("STOPLOSS LONG", "LONG",stop = longStopPrice)
+
+// if strategy.position_size < 0 and close <= shortStopToEntryPrice
+//     strategy.exit("STOPLOSS SHORT ENTRY", "SHORT",stop=strategy.position_avg_price)
+
+if strategy.position_size < 0 and low <= shortExitPrice
+    strategy.exit("PROFIT SHORT","SHORT", limit=shortExitPrice)
+    
+if strategy.position_size < 0 and close >= shortStopPrice
+    strategy.exit("STOPLOSS SHORT", "SHORT",stop=shortStopPrice)
